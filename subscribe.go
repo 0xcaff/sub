@@ -15,7 +15,6 @@ func (s *Sub) buildHubReq(values url.Values) (*http.Request, error) {
 	values.Set("hub.topic", s.Topic.String())
 
 	bodyReader := strings.NewReader(values.Encode())
-	println(values.Encode())
 	req, err := http.NewRequest(http.MethodPost, s.Hub.String(), bodyReader)
 	if err != nil {
 		return nil, err

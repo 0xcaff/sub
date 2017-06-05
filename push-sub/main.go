@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"time"
@@ -11,9 +9,9 @@ import (
 	"github.com/caffinatedmonkey/sub"
 )
 
-// const topic = "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCiGMIk8oeayv91jjTgm-CIw"
+const topic = "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCF8wOZvgrBZzj4netRo3m2A"
 
-const topic = "http://push-pub.appspot.com/feed"
+// const topic = "http://push-pub.appspot.com/feed"
 
 func main() {
 	// discover hub
@@ -24,17 +22,16 @@ func main() {
 
 	// ensure secure hub
 	s.Hub.Scheme = "https"
-	fmt.Printf("Hub: %s\n", s.Hub)
 
 	// register server at random endpoint
-	randomEndpoint := RandStringBytes(99)
+	randomEndpoint := string(sub.RandAsciiBytes(99))
 	s.Callback = MustParseUrl("https://hub.ydns.eu/" + randomEndpoint)
-	fmt.Printf("Callback: %s\n", s.Callback)
+	fmt.Println(s.Callback)
 
 	http.Handle("/"+randomEndpoint, &LoggerHandler{s})
 	s.OnMessage = sub.MessageCallback(func(r *http.Request, body []byte) {
-		fmt.Printf("%s", body)
-		fmt.Println(r)
+		fmt.Printf("Request: %#v\n Body: %s\n", body)
+		fmt.Println()
 	})
 
 	s.OnError = sub.ErrorCallback(func(e error) {
@@ -46,17 +43,10 @@ func main() {
 
 	err = s.Subscribe()
 	if err != nil {
-		if re, ok := err.(*sub.ResponseError); ok {
-			message, err := ioutil.ReadAll(re.Response.Body)
-			if err != nil {
-				panic(err)
-			}
-
-			fmt.Println(string(message))
-		}
-
 		panic(err)
 	}
+
+	fmt.Println(string(s.Secret))
 
 	// wait forever
 	time.Sleep(10000 * time.Hour)
@@ -75,17 +65,6 @@ type LoggerHandler struct {
 }
 
 func (h *LoggerHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
-
+	fmt.Printf("Request: %#v\n", r)
 	h.Handler.ServeHTTP(rw, r)
-}
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func RandStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }

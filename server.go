@@ -7,9 +7,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-
-	"fmt"
 )
+
+const sha1Header = "sha1="
 
 // Handles the incoming request for the subscriber.
 func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
@@ -80,14 +80,13 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 				})
 			}
 
-			http.Error(rw, "", http.StatusBadRequest)
+			http.Error(rw, "Unknown request type", http.StatusBadRequest)
 			return
 		}
 
 		// echo the challenge
 		challenge := values.Get("hub.challenge")
 
-		fmt.Println(challenge)
 		rw.WriteHeader(http.StatusOK)
 		io.WriteString(rw, challenge)
 
@@ -103,7 +102,38 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		// check hmac
-		messageMac := []byte(r.Header.Get("X-Hub-Signature"))
+		messageMac := r.Header.Get("X-Hub-Signature")
+
+		// messageMac starts with sha1=
+		ourHeader, digest := messageMac[0:len(sha1Header)],
+			messageMac[len(sha1Header):]
+
+		if ourHeader != sha1Header {
+			if s.OnError != nil {
+				s.OnError(&RequestError{
+					Request: r,
+					Message: "The header was invalid.",
+				})
+			}
+
+			http.Error(rw, "X-Hub-Signature header is invalid", http.StatusBadRequest)
+			return
+		}
+
+		// de-hex encode
+		decoded, err := hex.DecodeString(digest)
+		if err != nil {
+			if s.OnError != nil {
+				s.OnError(&RequestError{
+					Request: r,
+					Message: err.Error(),
+				})
+			}
+
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		message, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			if s.OnError != nil {
@@ -117,7 +147,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 		// this only checks the authenticity of the body. The headers could still
 		// be tampered with.
-		isValid := checkMAC(message, messageMac, s.Secret)
+		isValid := checkMAC(message, decoded, s.Secret)
 		if !isValid && s.OnError != nil {
 			// invalid hmac signature
 			s.OnError(&RequestError{
@@ -142,7 +172,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			Message: "Unknown request",
 		})
 	}
-	http.Error(rw, "", http.StatusBadRequest)
+	http.Error(rw, "Unknown request", http.StatusBadRequest)
 }
 
 // A helper function which computes and securely compares the sha1 mac of a
@@ -150,17 +180,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 func checkMAC(message, messageMac, key []byte) bool {
 	mac := hmac.New(sha1.New, key)
 	mac.Write(message)
-
 	calculatedMac := mac.Sum(nil)
-	calcMacHeader := []byte("sha1=")
-	calcMacHeader = append(calcMacHeader, toHex(calculatedMac)...)
 
-	println(string(calcMacHeader))
-	return hmac.Equal(messageMac, calcMacHeader)
-}
-
-func toHex(src []byte) []byte {
-	dst := make([]byte, hex.EncodedLen(len(src)))
-	hex.Encode(dst, src)
-	return dst
+	return hmac.Equal(messageMac, calculatedMac)
 }
