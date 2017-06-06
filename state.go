@@ -9,26 +9,8 @@ const (
 	Subscribed
 )
 
-type mode int
-
 const (
-	subMode mode = iota
-	unsubMode
-	deniedMode
+	subscribeMode   = "subscribe"
+	unsubscribeMode = "unsubscribe"
+	deniedMode      = "denied"
 )
-
-func (m mode) String() string {
-	switch m {
-	case subMode:
-		return "subscribe"
-
-	case unsubMode:
-		return "unsubscribe"
-
-	case deniedMode:
-		return "denied"
-
-	default:
-		return ""
-	}
-}

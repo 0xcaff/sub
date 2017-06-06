@@ -11,10 +11,16 @@ package sub
 import (
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type MessageCallback func(*http.Request, []byte)
 type ErrorCallback func(error)
+type LeaseCallback func(*Sub) error
+
+var DefaultLeaseCallback = func(s *Sub) error {
+	return s.Subscribe()
+}
 
 // Represents a subscription to a topic on a PubSubHubbub hub.
 type Sub struct {
@@ -36,12 +42,23 @@ type Sub struct {
 	// called.
 	OnMessage MessageCallback
 
-	// When a broken message is handled, errors are dispatched to this callback.
+	// When a broken message is handled, the hub cancels our subscription or the
+	// renewing the lease fails, errors are dispatched to this callback.
 	OnError ErrorCallback
+
+	// Called when it is time to renew the lease. This can be used to make
+	// changes during lease renewals.
+	OnRenewLease LeaseCallback
 
 	// The client which is used to make requests to the hub.
 	Client *http.Client
 
 	// The current state of the client.
 	State State
+
+	// The time at which the lease will expire.
+	LeaseExpiry time.Time
+
+	// A channel to cancel any pending renewals.
+	cancelRenew chan struct{}
 }

@@ -6,31 +6,96 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
-// A helper function to send requests to the hub.
-func (s *Sub) buildHubReq(values url.Values) (*http.Request, error) {
+// Tries to cancel automatic renewal of the subscription. If the renewal was
+// sucessfully cancelled, returns true. The renewal can fail when there is no
+// renewal to cancel, a renewal is currently in progress.
+func (s *Sub) CancelRenewal() bool {
+	select {
+	case s.cancelRenew <- struct{}{}:
+		return true
+
+	default:
+		return false
+	}
+}
+
+// Schedule a callback to run when the lease is close to expiration.
+func (s *Sub) scheduleRenewal() {
+	numTimeToExpiry := int64(float64(time.Now().Sub(s.LeaseExpiry)) * 0.75)
+	if numTimeToExpiry < 0 {
+		numTimeToExpiry = 0
+	}
+
+	timer := time.NewTimer(time.Duration(numTimeToExpiry))
+	go func() {
+		select {
+		case <-timer.C:
+			// handle update
+			// re-subscribe
+			err := s.Subscribe()
+			if err != nil {
+				if s.OnError != nil {
+					s.OnError(err)
+				}
+
+				return
+			}
+
+		case <-s.cancelRenew:
+			// stop the timer so it doesn't leak
+			timer.Stop()
+			return
+		}
+	}()
+}
+
+// A helper function to send requests to the hub. It populates the hub.callback
+// and hub.topic fields then builds and sends a request with the encoded values
+// and appropriate content type. If the request returns a non-202 status code,
+// an RequestError is returned.
+func (s *Sub) sendHubReq(values url.Values) error {
 	// identifying information
 	values.Set("hub.callback", s.Callback.String())
 	values.Set("hub.topic", s.Topic.String())
 
+	// encode request
 	bodyReader := strings.NewReader(values.Encode())
 	req, err := http.NewRequest(http.MethodPost, s.Hub.String(), bodyReader)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return req, nil
+
+	// send requst
+	resp, err := s.Client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	// check for application errors
+	if resp.StatusCode != http.StatusAccepted {
+		return &ResponseError{
+			Response: resp,
+			Message:  "Received non 200 status code",
+		}
+	}
+
+	return nil
 }
 
 const maxSecretLen = 200 - 1
 
+// Subscribes suggesting a lease time of leaseSeconds. The hub gets the final
+// decision on what the lease time actually is.
 func (s *Sub) SubscribeWithLease(leaseSeconds int) error {
 	values := url.Values{}
 
 	// add mode
-	values.Set("hub.mode", subMode.String())
+	values.Set("hub.mode", subscribeMode)
 
 	// add lease time
 	if leaseSeconds != 0 {
@@ -42,33 +107,21 @@ func (s *Sub) SubscribeWithLease(leaseSeconds int) error {
 		s.Secret = RandAsciiBytes(maxSecretLen)
 	}
 
-	// send secret
+	// add secret
 	values.Set("hub.secret", string(s.Secret))
 
 	// send request
-	req, err := s.buildHubReq(values)
-	if err != nil {
-		return err
-	}
-
-	resp, err := s.Client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	// check application errors
-	if resp.StatusCode != http.StatusAccepted {
-		return &ResponseError{
-			Response: resp,
-			Message:  "Received non 200 status code",
-		}
-	}
-
-	return nil
+	return s.sendHubReq(values)
 }
 
 func (s *Sub) Subscribe() error {
 	return s.SubscribeWithLease(0)
+}
+
+func (s *Sub) Unsubscribe() error {
+	values := url.Values{}
+	values.Set("hub.mode", unsubscribeMode)
+	return s.sendHubReq(values)
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

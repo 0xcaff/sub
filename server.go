@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 const sha1Header = "sha1="
@@ -35,7 +37,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		mode := values.Get("hub.mode")
-		if mode == deniedMode.String() {
+		if mode == deniedMode {
 			// a subscription can be denied without requesting a change
 			s.State = Unsubscribed
 
@@ -47,7 +49,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 				})
 			}
 
-			// TODO: Cancel resubscription
+			s.CancelRenewal()
 			return
 		}
 
@@ -67,9 +69,9 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if mode == subMode.String() {
+		if mode == subscribeMode {
 			s.State = Subscribed
-		} else if mode == unsubMode.String() {
+		} else if mode == unsubscribeMode {
 			s.State = Unsubscribed
 		} else {
 			// bad request
@@ -84,13 +86,28 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		leaseStr := values.Get("hub.lease_seconds")
+		leaseSecs, err := strconv.ParseInt(leaseStr, 10, 64)
+		if err != nil {
+			if s.OnError != nil {
+				s.OnError(&RequestError{
+					Request: r,
+					Message: err.Error(),
+				})
+			}
+
+			http.Error(rw, "Invalid lease seconds format", http.StatusBadRequest)
+			return
+		}
+		s.LeaseExpiry = time.Now().Add(time.Duration(leaseSecs) * time.Second)
+		s.scheduleRenewal()
+
 		// echo the challenge
 		challenge := values.Get("hub.challenge")
 
 		rw.WriteHeader(http.StatusOK)
 		io.WriteString(rw, challenge)
 
-		// TODO: Register a listener for the lease
 		return
 	}
 
