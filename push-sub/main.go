@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/caffinatedmonkey/sub"
+	"github.com/0xcaff/sub"
 )
 
 const topic = "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCF8wOZvgrBZzj4netRo3m2A"
