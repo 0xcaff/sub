@@ -19,17 +19,24 @@ func TestSubscribe(t *testing.T) {
 			t.Error(err)
 		}
 
+		gotContentType := r.Header.Get("Content-Type")
+		if gotContentType != "application/x-www-form-urlencoded" {
+			t.Error("Incorrect content type", gotContentType)
+		}
+
 		body := string(byteBody)
 		values, err := url.ParseQuery(body)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if values.Get("hub.mode") != "subscribe" {
+		gotMode := values.Get("hub.mode")
+		if gotMode != "subscribe" {
 			t.Error("Incorrect mode")
 		}
 
-		if values.Get("hub.lease_seconds") != "" {
+		gotLease := values.Get("hub.lease_seconds")
+		if gotLease != "" {
 			t.Error("Incorrect lease time")
 		}
 
@@ -38,16 +45,14 @@ func TestSubscribe(t *testing.T) {
 			t.Error("Incorrect secret length")
 		}
 
-		if values.Get("hub.callback") != callback {
+		gotCb := values.Get("hub.callback")
+		if gotCb != callback {
 			t.Error("Incorrect callback.")
 		}
 
-		if values.Get("hub.topic") != topic {
+		gotTopic := values.Get("hub.topic")
+		if gotTopic != topic {
 			t.Error("Incorrect topic")
-		}
-
-		if r.Header.Get("Content-Type") != "application/x-www-form-urlencoded" {
-			t.Error("Incorrect content type")
 		}
 
 		w.WriteHeader(http.StatusAccepted)
@@ -63,5 +68,65 @@ func TestSubscribe(t *testing.T) {
 		Client:   http.DefaultClient,
 	}
 
-	subscription.Subscribe()
+	err := subscription.Subscribe()
+	if err != nil {
+		t.Error(err)
+	}
 }
+
+func TestUnsubscribe(t *testing.T) {
+	topic := "http://example.com/feed.xml"
+	callback := "https://my-server.com/subscriber"
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		byteBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+
+		gotContentType := r.Header.Get("Content-Type")
+		if gotContentType != "application/x-www-form-urlencoded" {
+			t.Error("Incorrect content type", gotContentType)
+		}
+
+		body := string(byteBody)
+		values, err := url.ParseQuery(body)
+		if err != nil {
+			t.Error(err)
+		}
+
+		gotMode := values.Get("hub.mode")
+		if gotMode != "unsubscribe" {
+			t.Error("Incorrect mode", gotMode)
+		}
+
+		gotCb := values.Get("hub.callback")
+		if gotCb != callback {
+			t.Error("Incorrect callback.", gotCb)
+		}
+
+		gotTopic := values.Get("hub.topic")
+		if gotTopic != topic {
+			t.Error("Incorrect topic", gotTopic)
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+	})
+
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	sub := &Sub{
+		Hub:      MustParseUrl(ts.URL),
+		Callback: MustParseUrl(callback),
+		Topic:    MustParseUrl(topic),
+		Client:   http.DefaultClient,
+	}
+
+	err := sub.Unsubscribe()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// TODO: Test Renewal

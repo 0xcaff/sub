@@ -89,8 +89,8 @@ func (s *Sub) sendHubReq(values url.Values) error {
 
 const maxSecretLen = 200 - 1
 
-// Subscribes suggesting a lease time of leaseSeconds. The hub gets the final
-// decision on what the lease time actually is.
+// Sends a subscription request to the hub suggesting a lease time of
+// leaseSeconds. The hub gets the final decision on the lease time.
 func (s *Sub) SubscribeWithLease(leaseSeconds int) error {
 	values := url.Values{}
 
@@ -114,10 +114,16 @@ func (s *Sub) SubscribeWithLease(leaseSeconds int) error {
 	return s.sendHubReq(values)
 }
 
+// Sends a subscription request to the hub. If there is no error, the
+// request completed sucessfully. State is only changed after the callback
+// server verifies.
 func (s *Sub) Subscribe() error {
 	return s.SubscribeWithLease(0)
 }
 
+// Sends an un-subscription request to the hub. If no error is returned, the
+// request completed sucessfully. State is only changed after the callback
+// server verifies.
 func (s *Sub) Unsubscribe() error {
 	values := url.Values{}
 	values.Set("hub.mode", unsubscribeMode)
