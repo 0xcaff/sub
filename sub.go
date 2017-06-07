@@ -14,9 +14,12 @@ import (
 	"time"
 )
 
-type MessageCallback func(*http.Request, []byte)
-type ErrorCallback func(error)
-type LeaseCallback func(*Sub) error
+// MessageCallback is supplied the request along with body in memory. The body
+// on request is always closed.
+type MessageCallback func(request *http.Request, body []byte)
+
+type ErrorCallback func(err error)
+type LeaseCallback func(subscription *Sub) error
 
 var DefaultLeaseCallback = func(s *Sub) error {
 	return s.Subscribe()
