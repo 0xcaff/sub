@@ -45,3 +45,28 @@ func TestDiscoverFromAtom(t *testing.T) {
 		t.Error("Got incorrect topic url: " + topicUrl)
 	}
 }
+
+func TestDiscoverFromHeaders(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Link", "<http://example.com/hub>; rel=hub")
+		w.Header().Add("Link", "<http://example.com/feed>; rel=self")
+	})
+
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+
+	subscription, err := Discover(ts.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	hubUrl := subscription.Hub.String()
+	if hubUrl != "http://example.com/hub" {
+		t.Error("Got incorrect hub url: " + hubUrl)
+	}
+
+	topicUrl := subscription.Topic.String()
+	if topicUrl != "http://example.com/feed" {
+		t.Error("Got incorrect topic url: " + topicUrl)
+	}
+}

@@ -86,6 +86,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// get the lease time
 		leaseStr := values.Get("hub.lease_seconds")
 		leaseSecs, err := strconv.ParseInt(leaseStr, 10, 64)
 		if err != nil {

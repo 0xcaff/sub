@@ -24,7 +24,7 @@ func (s *Sub) CancelRenewal() bool {
 
 // Schedule a callback to run when the lease is close to expiration.
 func (s *Sub) scheduleRenewal() {
-	numTimeToExpiry := int64(float64(time.Now().Sub(s.LeaseExpiry)) * 0.75)
+	numTimeToExpiry := int64(float64(s.LeaseExpiry.Sub(time.Now())) * 0.75)
 	if numTimeToExpiry < 0 {
 		numTimeToExpiry = 0
 	}
