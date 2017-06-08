@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"time"
 
 	"testing"
 )
@@ -129,4 +130,47 @@ func TestUnsubscribe(t *testing.T) {
 	}
 }
 
-// TODO: Test Renewal
+func TestRenewal(t *testing.T) {
+	// initialize
+	waitChan := make(chan struct{})
+	sub := &Sub{
+		cancelRenew: make(chan struct{}),
+		LeaseExpiry: time.Now(), // some time in the future/present so renewal will run
+	}
+	sub.OnRenewLease = LeaseCallback(func(s *Sub) error {
+		if s != sub {
+			t.Error("The sub is invalid")
+		}
+
+		waitChan <- struct{}{}
+		return nil
+	})
+
+	// ensure that OnRenewLease is called
+	sub.scheduleRenewal()
+	<-waitChan
+}
+
+func TestCancelRenewal(t *testing.T) {
+	// initialize
+	sub := &Sub{
+		cancelRenew: make(chan struct{}),
+		OnRenewLease: LeaseCallback(func(s *Sub) error {
+			t.Error("The lease shouldn't have been renewed.")
+			return nil
+		}),
+
+		// enough time to to schedule the renewal and cancel but not too
+		// long to verify that OnRenewLease isn't called.
+		LeaseExpiry: time.Now().Add(500 * time.Millisecond),
+	}
+
+	// ensure that when we cancel, it's sucessful and OnRenewLease isn't fired.
+	sub.scheduleRenewal()
+	success := sub.CancelRenewal()
+	if !success {
+		t.Error("Failed to cancel lease")
+	}
+
+	time.Sleep(500 * time.Millisecond)
+}

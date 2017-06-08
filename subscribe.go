@@ -11,15 +11,18 @@ import (
 
 // Tries to cancel automatic renewal of the subscription. If the renewal was
 // sucessfully cancelled, returns true. The renewal can fail when there is no
-// renewal to cancel, a renewal is currently in progress.
-func (s *Sub) CancelRenewal() bool {
-	select {
-	case s.cancelRenew <- struct{}{}:
-		return true
+// renewal to cancel or a renewal is currently in progress.
 
-	default:
+// Cancels the automatic renewal of the subscription. If there was no renewal to
+// cancel, returns false.
+func (s *Sub) CancelRenewal() bool {
+	if s.cancelRenew == nil {
+		// there is no automated renewal happening
 		return false
 	}
+
+	s.cancelRenew <- struct{}{}
+	return true
 }
 
 // Schedule a callback to run when the lease is close to expiration.
@@ -29,13 +32,17 @@ func (s *Sub) scheduleRenewal() {
 		numTimeToExpiry = 0
 	}
 
+	// add channel to cancel renewals and signal that there is something to
+	// cancel
+	s.cancelRenew = make(chan struct{})
+
 	timer := time.NewTimer(time.Duration(numTimeToExpiry))
 	go func() {
 		select {
 		case <-timer.C:
 			// handle update
-			// re-subscribe
-			err := s.Subscribe()
+			// renew lease
+			err := s.OnRenewLease(s)
 			if err != nil {
 				if s.OnError != nil {
 					s.OnError(err)
@@ -45,6 +52,9 @@ func (s *Sub) scheduleRenewal() {
 			}
 
 		case <-s.cancelRenew:
+			// remove the channel to signal that there is no automatic renewal
+			s.cancelRenew = nil
+
 			// stop the timer so it doesn't leak
 			timer.Stop()
 			return

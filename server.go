@@ -13,6 +13,8 @@ import (
 
 const sha1Header = "sha1="
 
+// TODO: This handler needs to be thread safe.
+
 // Handles the incoming request for the subscriber.
 func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
