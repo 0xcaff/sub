@@ -16,18 +16,30 @@ func MustParseUrl(raw string) *url.URL {
 	return url
 }
 
-func TestRandAsciiBytesEven(t *testing.T) {
-	l := 10
-	random := RandAsciiBytes(l)
-	if len(random) != l {
-		t.Error("Incorrect length", len(random), string(random))
-	}
-}
+func TestRandAsciiBytes(t *testing.T) {
+	sizes := []int{100, 99}
 
-func TestRandAsciiBytesOdd(t *testing.T) {
-	l := 101
-	random := RandAsciiBytes(l)
-	if len(random) != l {
-		t.Error("Incorrect length", len(random), string(random))
+	for _, size := range sizes {
+		// get random bytes
+		random := RandAsciiBytes(size)
+
+		// check length
+		if len(random) != size {
+			t.Error("len(random)", len(random), "expected", size)
+		}
+
+		// check characters
+	outerLoop:
+		for idx, randomChar := range random {
+			for _, char := range encodeURL {
+				if char == rune(randomChar) {
+					continue outerLoop
+				}
+			}
+
+			// we've checked the entire string and the randomChar isn't a
+			// encodeUrl char
+			t.Error("Invalid Character", string(randomChar), "from", string(random), "at", idx)
+		}
 	}
 }

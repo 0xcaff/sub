@@ -9,10 +9,7 @@
 package sub
 
 import (
-	"bytes"
 	"crypto/rand"
-	"encoding/base64"
-	"io"
 	"net/http"
 	"net/url"
 	"sync"
@@ -65,27 +62,35 @@ type Sub struct {
 	requestLock sync.Mutex
 }
 
+// len(encodeURL) == 64. This allows (x <= 265) x % 64 to have an even
+// distribution.
+const encodeURL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
 // A helper function create and fill a slice of length n with characters from
 // a-zA-Z0-9_-. It panics if there are any problems getting random bytes.
 func RandAsciiBytes(n int) []byte {
-	// The number of input bytes needed to have more than enough base64 output
-	inputBytesNeeded := int64(n/4*3 + 1)
+	output := make([]byte, n)
 
-	// base64 encoded output
-	output := bytes.NewBuffer(make([]byte, 0, n))
+	// We will take n bytes, one byte for each character of output.
+	randomness := make([]byte, n)
 
-	// url safe, emits to output, input is writeRandTo
-	enc := base64.RawURLEncoding
-	writeRandTo := base64.NewEncoder(enc, output)
-	_, err := io.CopyN(writeRandTo, rand.Reader, inputBytesNeeded)
+	// read all random
+	_, err := rand.Read(randomness)
 	if err != nil {
 		panic(err)
 	}
 
-	err = writeRandTo.Close()
-	if err != nil {
-		panic(err)
+	// fill output
+	for pos := range output {
+		// get random item
+		random := uint8(randomness[pos])
+
+		// random % 64
+		randomPos := random % uint8(len(encodeURL))
+
+		// put into output
+		output[pos] = encodeURL[randomPos]
 	}
 
-	return output.Bytes()[:n]
+	return output
 }
