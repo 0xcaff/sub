@@ -4,7 +4,8 @@
 
 // NOTE:
 // Some of these messages aren't secured, especially the protocol ones from the
-// hub to us. To stay safe, use high entropy, HTTPS only callback urls.
+// hub to us. To stay safe, use high entropy, HTTPS only callback urls and only
+// talk to the hub over HTTMS.
 
 package sub
 
@@ -18,19 +19,15 @@ import (
 
 // Represents a subscription to a topic on a PubSubHubbub hub.
 type Sub struct {
-	// The url of the hub.
-	Hub *url.URL
-
 	// The url of the topic which this subscription receives events for.
 	Topic *url.URL
+
+	// The url of the hub. This can be discovered using Sub.Discover()
+	Hub *url.URL
 
 	// The url which is provided to the hub during subscription and renewal.
 	// This url is allowed to contain query parameters.
 	Callback *url.URL
-
-	// The < 200 byte long secret used to validate that messages are coming from
-	// the real server.
-	Secret []byte
 
 	// When a non-PubSubHubbub message from the hub arrives, this callback is
 	// called. The body on request is always closed.
@@ -48,6 +45,10 @@ type Sub struct {
 	// The client which is used to make requests to the hub.
 	Client *http.Client
 
+	// The < 200 byte long secret used to validate that messages are coming from
+	// the real server.
+	Secret []byte
+
 	// The current state of the client.
 	State State
 
@@ -60,6 +61,12 @@ type Sub struct {
 	// A mutex which ensures that multiple callback requests don't leave the
 	// response handler in an inconsistent state.
 	requestLock sync.Mutex
+}
+
+func New() *Sub {
+	return &Sub{
+		Client: http.DefaultClient,
+	}
 }
 
 // len(encodeURL) == 64. This allows (x <= 265) x % 64 to have an even

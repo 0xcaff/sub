@@ -30,7 +30,10 @@ func TestDiscoverFromAtom(t *testing.T) {
 	ts := httptest.NewServer(handler)
 	defer ts.Close()
 
-	subscription, err := Discover(ts.URL)
+	subscription := New()
+	subscription.Topic = MustParseUrl(ts.URL)
+
+	err := subscription.Discover()
 	if err != nil {
 		t.Error(err)
 	}

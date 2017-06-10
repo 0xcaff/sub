@@ -57,13 +57,14 @@ func main() {
 	for name, subscription := range conf.Subscriptions {
 		fields := log.Fields{"name": name}
 
-		var s *sub.Sub
+		s := sub.New()
+		s.Topic = &subscription.Topic.URL
 
 		// discover hub if needed
 		if subscription.Hub == nil {
 			log.WithFields(fields).Info("discovering hub")
 
-			s, err = sub.Discover(subscription.Topic.String())
+			err = s.Discover()
 			if err != nil {
 				log.WithFields(fields).Error(err)
 				return
@@ -76,13 +77,8 @@ func main() {
 
 			log.WithFields(fields).Info("discovered hub: ", s.Hub)
 		} else {
-			// TODO: Proper initialization
-			s = &sub.Sub{}
-			s.Client = http.DefaultClient
 			s.Hub = &subscription.Hub.URL
 		}
-
-		s.Topic = &subscription.Topic.URL
 
 		// register at random endpoint. We are using a random, hard to guess
 		// endpoint for security.
@@ -207,8 +203,9 @@ func main() {
 
 				// turn off server
 				server.Shutdown(nil)
+			} else {
+				log.WithFields(fields).Info("subscribed")
 			}
-			log.WithFields(fields).Info("subscribed")
 		}
 	}()
 
