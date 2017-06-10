@@ -28,10 +28,9 @@ type Subscription struct {
 	// looking up the topic url.
 	Hub *URL
 
-	// A command which is called when a verified message is received. The
-	// message body is passed to the program through standard input.
-	Bin  string
-	Args []string
+	// An array of a command followed by arguments called when a verified
+	// message is received. The message body sent through standard input.
+	Command []string
 
 	// Allow connecting to a discovered hub over http. This is insecure because
 	// there is no way to verify state change requests to the callback server
@@ -61,8 +60,8 @@ func GetConfigReader(r io.Reader) (*Config, error) {
 			return nil, &FieldMissingError{name, "topic", sub}
 		}
 
-		if len(sub.Bin) == 0 {
-			return nil, &FieldMissingError{name, "bin", sub}
+		if len(sub.Command) < 1 {
+			return nil, &FieldMissingError{name, "command", sub}
 		}
 	}
 

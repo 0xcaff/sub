@@ -12,8 +12,7 @@ basepath="https://sub.shipped.com/"
 [subscriptions.blog_feed]
 topic="https://example.com/feed.xml"
 hub="https://example.com/hub"
-bin="/usr/bin/env"
-args=["tee", "/tmp/output.txt"]
+command=["/usr/bin/tee", "/tmp/output.txt"]
 `
 
 func TestParseConfig(t *testing.T) {

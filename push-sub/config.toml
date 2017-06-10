@@ -7,8 +7,5 @@ basepath="https://hub.ydns.eu/"
 [subscriptions.youtube_channel]
 topic="https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCF8wOZvgrBZzj4netRo3m2A"
 # hub="https://pubsubhubbub.appspot.com"
-
-# TODO: The command stuff is broken!
-bin="/usr/bin/env"
-args=["nc", "127.0.0.1", "8119"]
+command=["/usr/bin/env", "tee", "/tmp/pub.txt"]
 

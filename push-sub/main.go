@@ -107,21 +107,18 @@ func main() {
 			stdin := bytes.NewReader(body)
 
 			// create cmd
-			cmd := &exec.Cmd{
-				Path:  subscription.Bin,
-				Args:  subscription.Args,
-				Stdin: stdin,
-			}
+			cmd := exec.Command(subscription.Command[0], subscription.Command[1:]...)
+			cmd.Stdin = stdin
 
 			// launch cmd
 			go func() {
 				log.WithFields(log.Fields{
 					"name": name,
-					"bin":  subscription.Bin,
-					"args": subscription.Args,
+					"args": subscription.Command,
 				}).Info("running")
 				log.WithFields(fields).Info("running")
-				err := cmd.Run()
+				output, err := cmd.CombinedOutput()
+				log.Debug("Output: ", string(output))
 				if err != nil {
 					log.WithFields(fields).Error(err)
 				}
