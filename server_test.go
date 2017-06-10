@@ -77,14 +77,14 @@ func TestMessageReceive(t *testing.T) {
 
 	// initialize subscription
 	s := &Sub{
-		OnMessage: MessageCallback(func(req *http.Request, rawBody []byte) {
+		OnMessage: func(req *http.Request, rawBody []byte) {
 			body := string(rawBody)
 
 			// compare body
 			if body != expectedBody {
 				t.Error("Body incorrect. Expected: " + expectedBody + " Got: " + body)
 			}
-		}),
+		},
 		Secret: []byte("orGXgeXafOMfMzJONfuJyUQZoILaCWKYNGaTvjOwnldjtkAmYyebVhkXrnUgLvBAZhkUMhczxsJcaxBKOgfaYqYKezwdWuLKHeA"),
 	}
 

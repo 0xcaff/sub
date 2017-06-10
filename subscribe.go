@@ -40,16 +40,8 @@ func (s *Sub) scheduleRenewal() {
 	go func() {
 		select {
 		case <-timer.C:
-			// handle update
-			// renew lease
-			err := s.OnRenewLease(s)
-			if err != nil {
-				if s.OnError != nil {
-					s.OnError(err)
-				}
-
-				return
-			}
+			// handle update, renew lease
+			s.OnRenewLease(s)
 
 		case <-s.cancelRenew:
 			// remove the channel to signal that there is no automatic renewal
@@ -102,6 +94,8 @@ const maxSecretLen = 200 - 1
 // Sends a subscription request to the hub suggesting a lease time of
 // leaseSeconds. The hub gets the final decision on the lease time.
 func (s *Sub) SubscribeWithLease(leaseSeconds int) error {
+	s.State = Requested
+
 	values := url.Values{}
 
 	// add mode
@@ -135,6 +129,8 @@ func (s *Sub) Subscribe() error {
 // request completed sucessfully. State is only changed after the callback
 // server verifies.
 func (s *Sub) Unsubscribe() error {
+	s.State = Requested
+
 	values := url.Values{}
 	values.Set("hub.mode", unsubscribeMode)
 	return s.sendHubReq(values)

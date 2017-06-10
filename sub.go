@@ -14,17 +14,6 @@ import (
 	"time"
 )
 
-// MessageCallback is supplied the request along with body in memory. The body
-// on request is always closed.
-type MessageCallback func(request *http.Request, body []byte)
-
-type ErrorCallback func(err error)
-type LeaseCallback func(subscription *Sub) error
-
-var DefaultLeaseCallback = func(s *Sub) error {
-	return s.Subscribe()
-}
-
 // Represents a subscription to a topic on a PubSubHubbub hub.
 type Sub struct {
 	// The url of the hub.
@@ -42,16 +31,17 @@ type Sub struct {
 	Secret []byte
 
 	// When a non-PubSubHubbub message from the hub arrives, this callback is
-	// called.
-	OnMessage MessageCallback
+	// called. The body on request is always closed.
+	OnMessage func(request *http.Request, body []byte)
 
-	// When a broken message is handled, the hub cancels our subscription or the
-	// renewing the lease fails, errors are dispatched to this callback.
-	OnError ErrorCallback
+	// When a broken message is handled or the hub cancels our subscription,
+	// this callback is called.
+	OnError func(err error)
 
 	// Called when it is time to renew the lease. This can be used to make
-	// changes during lease renewals.
-	OnRenewLease LeaseCallback
+	// changes during lease renewals. Errors returned from here are sent to
+	// OnError.
+	OnRenewLease func(subscription *Sub)
 
 	// The client which is used to make requests to the hub.
 	Client *http.Client

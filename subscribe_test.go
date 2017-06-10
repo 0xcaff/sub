@@ -137,14 +137,13 @@ func TestRenewal(t *testing.T) {
 		cancelRenew: make(chan struct{}),
 		LeaseExpiry: time.Now(), // some time in the future/present so renewal will run
 	}
-	sub.OnRenewLease = LeaseCallback(func(s *Sub) error {
+	sub.OnRenewLease = func(s *Sub) {
 		if s != sub {
 			t.Error("The sub is invalid")
 		}
 
 		waitChan <- struct{}{}
-		return nil
-	})
+	}
 
 	// ensure that OnRenewLease is called
 	sub.scheduleRenewal()
@@ -155,10 +154,9 @@ func TestCancelRenewal(t *testing.T) {
 	// initialize
 	sub := &Sub{
 		cancelRenew: make(chan struct{}),
-		OnRenewLease: LeaseCallback(func(s *Sub) error {
+		OnRenewLease: func(s *Sub) {
 			t.Error("The lease shouldn't have been renewed.")
-			return nil
-		}),
+		},
 
 		// enough time to to schedule the renewal and cancel but not too
 		// long to verify that OnRenewLease isn't called.

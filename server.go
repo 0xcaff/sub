@@ -41,6 +41,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		mode := values.Get("hub.mode")
 		if mode == deniedMode {
 			// a subscription can be denied without requesting a change
+			// unsubscriptions can't be denied
 			s.State = Unsubscribed
 
 			// forward error
@@ -51,6 +52,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 				})
 			}
 
+			// ensures renewal is cancelled
 			s.CancelRenewal()
 			return
 		}
@@ -88,6 +90,7 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// TODO: lease_seconds on unsibscribe
 		// get the lease time
 		leaseStr := values.Get("hub.lease_seconds")
 		leaseSecs, err := strconv.ParseInt(leaseStr, 10, 64)

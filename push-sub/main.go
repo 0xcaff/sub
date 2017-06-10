@@ -1,70 +1,227 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
+	"flag"
+	"net"
 	"net/http"
-	"net/url"
+	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/0xcaff/sub"
+	log "github.com/sirupsen/logrus"
 )
 
-const topic = "https://www.youtube.com/xml/feeds/videos.xml?channel_id=UCF8wOZvgrBZzj4netRo3m2A"
+// TODO: Better logging
+var (
+	confPath = flag.String(
+		"config",
+		"",
+		"The location of the configuration file.",
+	)
 
-// const topic = "http://push-pub.appspot.com/feed"
+	verbosity = flag.Int(
+		"verbosity",
+		4, // InfoLevel
+		"The log level. Higher is more detailed.",
+	)
+)
 
 func main() {
-	// discover hub
-	s, err := sub.Discover(topic)
-	if err != nil {
-		panic(err)
+	flag.Parse()
+
+	subscriptions := map[string]*sub.Sub{}
+
+	// set log level
+	log.SetLevel(log.Level(*verbosity))
+
+	// default config path
+	if len(*confPath) == 0 {
+		*confPath = filepath.Join(ConfigBaseDir, "push-sub", "config.toml")
 	}
 
-	// ensure secure hub
-	s.Hub.Scheme = "https"
+	// open config file
+	conf, err := GetConfig(*confPath)
+	if err != nil {
+		log.Error(err)
+		return
+	}
 
-	// register server at random endpoint
-	randomEndpoint := string(sub.RandAsciiBytes(99))
-	s.Callback = MustParseUrl("https://hub.ydns.eu/" + randomEndpoint)
-	fmt.Println(s.Callback)
+	// The muxer which will be delegating all requests to the callback server.
+	mux := &http.ServeMux{}
 
-	http.Handle("/"+randomEndpoint, &LoggerHandler{s})
-	s.OnMessage = sub.MessageCallback(func(r *http.Request, body []byte) {
-		fmt.Printf("Request: %#v\n Body: %s\n", body)
-		fmt.Println()
+	// register all listeners
+	for name, subscription := range conf.Subscriptions {
+		fields := log.Fields{"name": name}
+
+		var s *sub.Sub
+
+		// discover hub if needed
+		if subscription.Hub == nil {
+			log.WithFields(fields).Info("discovering hub")
+
+			s, err = sub.Discover(subscription.Topic.String())
+			if err != nil {
+				log.WithFields(fields).Error(err)
+				return
+			}
+
+			// ensure secure hub
+			if !subscription.AllowInsecure {
+				s.Hub.Scheme = "https"
+			}
+
+			log.WithFields(fields).Info("discovered hub: ", s.Hub)
+		} else {
+			// TODO: Proper initialization
+			s = &sub.Sub{}
+			s.Client = http.DefaultClient
+			s.Hub = &subscription.Hub.URL
+		}
+
+		s.Topic = &subscription.Topic.URL
+
+		// register at random endpoint. We are using a random, hard to guess
+		// endpoint for security.
+		endpoint := "/" + string(sub.RandAsciiBytes(99))
+
+		// record callback url
+		s.Callback = conf.BasePath.ResolveReference(
+			MustParseUrl(endpoint))
+
+		if log.GetLevel() >= log.InfoLevel {
+			fields["endpoint"] = s.Callback.String()
+		}
+
+		// setup listeners
+		s.OnMessage = func(_ *http.Request, body []byte) {
+			fields := log.Fields{"name": name}
+			log.WithFields(fields).Info("received message")
+			log.WithFields(fields).Debug("message: ", string(body))
+
+			// create stdin
+			stdin := bytes.NewReader(body)
+
+			// create cmd
+			cmd := &exec.Cmd{
+				Path:  subscription.Bin,
+				Args:  subscription.Args,
+				Stdin: stdin,
+			}
+
+			// launch cmd
+			go func() {
+				log.WithFields(log.Fields{
+					"name": name,
+					"bin":  subscription.Bin,
+					"args": subscription.Args,
+				}).Info("running")
+				log.WithFields(fields).Info("running")
+				err := cmd.Run()
+				if err != nil {
+					log.WithFields(fields).Error(err)
+				}
+			}()
+		}
+
+		s.OnError = func(err error) {
+			// we only warn because these are non-critical errors
+			log.WithFields(fields).Warning(err)
+		}
+
+		s.OnRenewLease = func(s *sub.Sub) {
+			log.WithFields(fields).Info("renewing")
+
+			// only try to renew once
+			err := s.Subscribe()
+			if err != nil {
+				log.Error(err)
+			}
+		}
+
+		// register the callback
+		log.WithFields(fields).Info("registered")
+		mux.Handle(endpoint, s)
+
+		subscriptions[name] = s
+	}
+
+	server := &http.Server{
+		Addr:    conf.Address,
+		Handler: mux,
+	}
+
+	// start listening
+	log.Info("listening on " + server.Addr)
+	listener, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	// unsub on shutdown
+	shutdownSignal := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignal, os.Interrupt)
+	isShuttingDown := false
+
+	go func() {
+		<-shutdownSignal
+		isShuttingDown = true
+
+		log.Info("shutting down")
+		var wg sync.WaitGroup
+		for name, subscription := range subscriptions {
+			wg.Add(1)
+			go func() {
+				fields := log.Fields{"name": name}
+				log.WithFields(fields).Info("unsubscribing")
+
+				err := subscription.Unsubscribe()
+				if err != nil {
+					log.WithFields(fields).Error(err)
+				}
+
+				log.WithFields(fields).Info("unsubscribed")
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
+		os.Exit(0)
+	}()
+
+	go func() {
+		// try subscribing to all subscriptions
+		for name, subscription := range subscriptions {
+			if isShuttingDown {
+				break
+			}
+
+			fields := log.Fields{"name": name}
+
+			err := subscription.Subscribe()
+			log.WithFields(fields).Info("subscribing")
+
+			if err != nil {
+				log.WithFields(fields).Error(err)
+
+				// turn off server
+				server.Shutdown(nil)
+			}
+			log.WithFields(fields).Info("subscribed")
+		}
+	}()
+
+	err = server.Serve(KeepAliveListener{
+		KeepAlive:   3 * time.Minute,
+		TCPListener: listener.(*net.TCPListener),
 	})
-
-	s.OnError = sub.ErrorCallback(func(e error) {
-		panic(e)
-	})
-
-	// localhost:17889
-	go http.ListenAndServe(":8080", nil) // &LoggerHandler{http.DefaultServeMux})
-
-	err = s.Subscribe()
 	if err != nil {
-		panic(err)
+		log.Error(err)
+		return
 	}
-
-	fmt.Println(string(s.Secret))
-
-	// wait forever
-	time.Sleep(10000 * time.Hour)
-}
-
-func MustParseUrl(raw string) *url.URL {
-	r, err := url.Parse(raw)
-	if err != nil {
-		panic(err)
-	}
-	return r
-}
-
-type LoggerHandler struct {
-	http.Handler
-}
-
-func (h *LoggerHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Request: %#v\n", r)
-	h.Handler.ServeHTTP(rw, r)
 }
