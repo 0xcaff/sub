@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -58,6 +59,10 @@ type Sub struct {
 
 	// A channel to cancel any pending renewals.
 	cancelRenew chan struct{}
+
+	// A mutex which ensures that multiple callback requests don't leave the
+	// response handler in an inconsistent state.
+	requestLock sync.Mutex
 }
 
 // A helper function create and fill a slice of length n with characters from

@@ -13,9 +13,7 @@ import (
 
 const sha1Header = "sha1="
 
-// TODO: This handler needs to be thread safe.
-
-// Handles the incoming request for the subscriber.
+// Implements http.Handler to handle incoming subscription requests.
 func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// handle as a protocol message
@@ -37,6 +35,9 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			http.Error(rw, "Topic not found", http.StatusNotFound)
 			return
 		}
+
+		s.requestLock.Lock()
+		defer s.requestLock.Unlock()
 
 		mode := values.Get("hub.mode")
 		if mode == deniedMode {
