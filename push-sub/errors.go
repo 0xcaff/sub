@@ -22,14 +22,11 @@ func (err *UndecodedError) Error() string {
 	return message
 }
 
-// Error returned by GetConfigReader when a field is missing from a
-// Subscription.
+// Error returned by GetConfigReader when a field is missing or empty.
 type FieldMissingError struct {
-	Name  string
 	Field string
-	Sub   *Subscription
 }
 
 func (e *FieldMissingError) Error() string {
-	return fmt.Sprintf("%s missing on subscription %s: %#v", e.Field, e.Name, e.Sub)
+	return fmt.Sprintf("%s missing", e.Field)
 }

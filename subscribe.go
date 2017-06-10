@@ -107,7 +107,7 @@ func (s *Sub) SubscribeWithLease(leaseSeconds int) error {
 
 	// generate secret
 	if len(s.Secret) == 0 {
-		s.Secret = RandAsciiBytes(maxSecretLen)
+		s.Secret = RandAlphanumBytes(maxSecretLen)
 	}
 
 	// add secret

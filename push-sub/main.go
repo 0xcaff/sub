@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,7 +18,7 @@ import (
 var (
 	confPath = flag.String(
 		"config",
-		"",
+		"./config.toml",
 		"The location of the configuration file.",
 	)
 
@@ -38,11 +37,7 @@ func main() {
 	// set log level
 	log.SetLevel(log.Level(*verbosity))
 
-	// default config path
-	if len(*confPath) == 0 {
-		*confPath = filepath.Join(ConfigBaseDir, "push-sub", "config.toml")
-	}
-
+	log.Info("reading config: ", *confPath)
 	// open config file
 	conf, err := GetConfig(*confPath)
 	if err != nil {
@@ -82,7 +77,7 @@ func main() {
 
 		// register at random endpoint. We are using a random, hard to guess
 		// endpoint for security.
-		endpoint := "/" + string(sub.RandAsciiBytes(99))
+		endpoint := "/" + string(sub.RandAlphanumBytes(99))
 
 		// record callback url
 		s.Callback = conf.BasePath.ResolveReference(
@@ -110,8 +105,8 @@ func main() {
 				log.WithFields(log.Fields{
 					"name": name,
 					"args": subscription.Command,
-				}).Info("running")
-				log.WithFields(fields).Info("running")
+				}).Info("running command")
+
 				output, err := cmd.CombinedOutput()
 				log.Debug("Output: ", string(output))
 				if err != nil {
@@ -127,6 +122,8 @@ func main() {
 
 		s.OnRenewLease = func(s *sub.Sub) {
 			log.WithFields(fields).Info("renewing")
+
+			// TODO: Shutdown when all renewals have failed.
 
 			// only try to renew once
 			err := s.Subscribe()

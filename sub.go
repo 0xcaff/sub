@@ -1,13 +1,14 @@
-// This packages implements a subscriber against version 0.4 of the PubSubHubbub
-// specification (
-// http://pubsubhubbub.github.io/PubSubHubbub/pubsubhubbub-core-0.4.html).
+/*
+This packages provides a subscriber for v0.4 of the PubSubHubbub protocol. It
+provides features like discovery and automated renewal while aiming to remain
+flexible and secure.
+*/
+package sub
 
 // NOTE:
 // Some of these messages aren't secured, especially the protocol ones from the
 // hub to us. To stay safe, use high entropy, HTTPS only callback urls and only
 // talk to the hub over HTTMS.
-
-package sub
 
 import (
 	"crypto/rand"
@@ -73,9 +74,11 @@ func New() *Sub {
 // distribution.
 const encodeURL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
+// TODO: Rename?
+
 // A helper function create and fill a slice of length n with characters from
 // a-zA-Z0-9_-. It panics if there are any problems getting random bytes.
-func RandAsciiBytes(n int) []byte {
+func RandAlphanumBytes(n int) []byte {
 	output := make([]byte, n)
 
 	// We will take n bytes, one byte for each character of output.

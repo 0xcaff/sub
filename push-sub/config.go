@@ -54,14 +54,23 @@ func GetConfigReader(r io.Reader) (*Config, error) {
 	}
 
 	// report missing information
+	if len(config.Address) == 0 {
+		return nil, &FieldMissingError{"address"}
+	}
+
+	if config.BasePath == nil {
+		return nil, &FieldMissingError{"basepath"}
+	}
+
 	for name, sub := range config.Subscriptions {
 		// we always need the topic
 		if sub.Topic == nil {
-			return nil, &FieldMissingError{name, "topic", sub}
+			return nil, &FieldMissingError{"subscriptions." + name + ".topic"}
 		}
 
+		// and command
 		if len(sub.Command) < 1 {
-			return nil, &FieldMissingError{name, "command", sub}
+			return nil, &FieldMissingError{"subscriptions." + name + ".command"}
 		}
 	}
 
@@ -85,17 +94,4 @@ type URL struct {
 
 func (u *URL) UnmarshalText(text []byte) error {
 	return u.URL.UnmarshalBinary(text)
-}
-
-var ConfigBaseDir = getEnv("XDG_CONFIG_HOME", "$HOME/.config")
-
-// Returns the value of the environment variable. If the variable is empty,
-// returns the os.ExpandEnv value of def.
-func getEnv(env, def string) string {
-	val := os.Getenv(env)
-	if len(val) == 0 {
-		return os.ExpandEnv(def)
-	}
-
-	return val
 }

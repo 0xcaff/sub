@@ -1,4 +1,5 @@
 //go:generate stringer -type=State
+
 package sub
 
 type State int

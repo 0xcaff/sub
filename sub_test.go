@@ -16,12 +16,12 @@ func MustParseUrl(raw string) *url.URL {
 	return url
 }
 
-func TestRandAsciiBytes(t *testing.T) {
+func TestRandAlphanumBytes(t *testing.T) {
 	sizes := []int{100, 99}
 
 	for _, size := range sizes {
 		// get random bytes
-		random := RandAsciiBytes(size)
+		random := RandAlphanumBytes(size)
 
 		// check length
 		if len(random) != size {
