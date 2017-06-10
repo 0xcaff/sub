@@ -16,7 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// TODO: Better logging
 var (
 	confPath = flag.String(
 		"config",

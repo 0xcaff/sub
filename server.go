@@ -75,6 +75,25 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 		if mode == subscribeMode {
 			s.State = Subscribed
+
+			// get the lease time
+			leaseStr := values.Get("hub.lease_seconds")
+			leaseSecs, err := strconv.ParseInt(leaseStr, 10, 64)
+			if err != nil {
+				if s.OnError != nil {
+					s.OnError(&RequestError{
+						Request: r,
+						Message: err.Error(),
+					})
+				}
+
+				http.Error(rw, "Invalid lease seconds format", http.StatusBadRequest)
+				return
+			}
+
+			// schedule renewal
+			s.LeaseExpiry = time.Now().Add(time.Duration(leaseSecs) * time.Second)
+			s.scheduleRenewal()
 		} else if mode == unsubscribeMode {
 			s.State = Unsubscribed
 		} else {
@@ -89,24 +108,6 @@ func (s *Sub) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			http.Error(rw, "Unknown request type", http.StatusBadRequest)
 			return
 		}
-
-		// TODO: lease_seconds on unsibscribe
-		// get the lease time
-		leaseStr := values.Get("hub.lease_seconds")
-		leaseSecs, err := strconv.ParseInt(leaseStr, 10, 64)
-		if err != nil {
-			if s.OnError != nil {
-				s.OnError(&RequestError{
-					Request: r,
-					Message: err.Error(),
-				})
-			}
-
-			http.Error(rw, "Invalid lease seconds format", http.StatusBadRequest)
-			return
-		}
-		s.LeaseExpiry = time.Now().Add(time.Duration(leaseSecs) * time.Second)
-		s.scheduleRenewal()
 
 		// echo the challenge
 		challenge := values.Get("hub.challenge")
