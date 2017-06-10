@@ -9,6 +9,10 @@
 package sub
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/base64"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -54,4 +58,29 @@ type Sub struct {
 
 	// A channel to cancel any pending renewals.
 	cancelRenew chan struct{}
+}
+
+// A helper function create and fill a slice of length n with characters from
+// a-zA-Z0-9_-. It panics if there are any problems getting random bytes.
+func RandAsciiBytes(n int) []byte {
+	// The number of input bytes needed to have more than enough base64 output
+	inputBytesNeeded := int64(n/4*3 + 1)
+
+	// base64 encoded output
+	output := bytes.NewBuffer(make([]byte, 0, n))
+
+	// url safe, emits to output, input is writeRandTo
+	enc := base64.RawURLEncoding
+	writeRandTo := base64.NewEncoder(enc, output)
+	_, err := io.CopyN(writeRandTo, rand.Reader, inputBytesNeeded)
+	if err != nil {
+		panic(err)
+	}
+
+	err = writeRandTo.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	return output.Bytes()[:n]
 }

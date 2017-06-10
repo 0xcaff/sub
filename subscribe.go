@@ -1,7 +1,6 @@
 package sub
 
 import (
-	"math/rand" // TODO: Detereministic
 	"net/http"
 	"net/url"
 	"strconv"
@@ -134,18 +133,4 @@ func (s *Sub) Unsubscribe() error {
 	values := url.Values{}
 	values.Set("hub.mode", unsubscribeMode)
 	return s.sendHubReq(values)
-}
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-// A helper function create and fill a slice of length n with characters from
-// a-zA-Z0-9.
-func RandAsciiBytes(n int) []byte {
-	b := make([]byte, n)
-	count := len(letterBytes)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(count)]
-	}
-
-	return b
 }
