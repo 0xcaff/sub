@@ -23,8 +23,10 @@ hub="https://pubsubhubbub.appspot.com"
 command=["/usr/bin/tee", "/tmp/pub.txt"]
 ```
 
+For more configuration options, check out [`config.go`][config].
+
 Now run `push-sub` and wait for messages. Make sure that `basepath` is
-publically visible and routes to `address`. When a message arrives, `command`
+publically visible and points to `address`. When a message arrives, `command`
 will be executed and the message will passed to it through standard input.
 
     INFO[0000] reading config: ./config.toml                
@@ -61,3 +63,4 @@ Daemonizing (Systemd)
 [releases]: https://github.com/0xcaff/sub/releases
 [thumb]: https://i.imgur.com/tMr6WMv.png
 [video]: https://asciinema.org/a/124256
+[config]: https://github.com/0xcaff/sub/blob/master/push-sub/config.go
