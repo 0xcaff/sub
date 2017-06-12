@@ -3,8 +3,9 @@ sub
 
 [![Build Status][build-status-image]][build-status]
 
-Sub is a go library to consume PubSubHubbub (PuSH) hubs. Check out the
-[documentation] for examples.
+Sub is a go library to consume PubSubHubbub (PuSH) hubs. PuSH is a
+server-to-server update protocol. It's used to notify servers about changes on
+other servers. Check out the [documentation] for examples of using this library.
 
 If you don't need fine-grained control of your subscriptions, check out
 [push-sub]. It's a daemon which maintains subscriptions and calls specified

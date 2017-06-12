@@ -1,16 +1,18 @@
 push-sub
 ========
 
-A daemon which maintains subscriptions with PubSubHubbub (PuSH) hubs and calls
-specified commands when messages arrive. It aims to make receiving PuSH updates
-secure and easy.
+push-sub is a daemon which maintains subscriptions with PubSubHubbub (PuSH) hubs
+and calls specified commands when messages arrive. PuSH is a server-to-server
+update protocol. It's used to notify servers about changes on other servers.
+This tool aims to make receiving PuSH updates secure and easy.
 
 [![thumb]][video]
 
 Usage
 -----
 
-Create a config file and run `push-sub`. Here's an example config file:
+Create a config file and run `push-sub`. Here's an example config file which to
+receives updates from a youtube channel topic and dumps them into `/tmp/pub.txt`:
 
 ```toml
 # config.toml
@@ -48,6 +50,8 @@ If you don't have `go`, check out the releases for prebuilt binaries.
 
 Daemonizing (Systemd)
 -----------
+
+Here is a systemd unit file to run `push-sub` as a daemon:
 
     [Unit]
     Description=PubSubHubbub Subscriber
